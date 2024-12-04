@@ -42,7 +42,7 @@ public class AesUtils {
                 row = 0;
                 col++;
             }
-            result[row][col] = text.substring(i, i + 2);
+            result[row][col] = text.substring(i, i + 2).toUpperCase();
             row++;
         }
         return result;
@@ -59,32 +59,14 @@ public class AesUtils {
         System.out.println("******************************************************************\n");
     }
 
-    //    public String[][] addRoundKeyAes(String[][] text, String[][] roundKey) {
-//        String[][] result = new String[4][4];
-//        for (int i = 0; i < 4; i++) {
-//            for (int j = 0; j < 4; j++) {
-//                String hex1 = text[i][j];
-//                String hex2 = roundKey[i][j];
-//                int num1 = Integer.parseInt(hex1, 16);
-//                int num2 = Integer.parseInt(hex2, 16);
-//                // Выполним операцию XOR
-//                int resultOfXOR = num1 ^ num2;
-//
-//                // Преобразуем результат обратно в 16-ричную строку
-//                String resultHex = Integer.toHexString(resultOfXOR);
-//                result[i][j] = resultHex;
-//            }
-//        }
-//        return result;
-//    }
     public String[][] addRoundKeyAes(String[][] text, String[][] roundKey) {
         String[][] result = new String[4][4];
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 4; j++) {
                 String hex1 = text[i][j];
                 String hex2 = roundKey[i][j];
-                String resultHex = xorHex(hex1, hex2);
-                result[i][j] = resultHex;
+                String resultHex = xorHex2(hex1, hex2);
+                result[i][j] = resultHex.toUpperCase();
             }
         }
         return result;
@@ -99,7 +81,7 @@ public class AesUtils {
                 char secondChar = hexValue.charAt(1);
                 int firstDecimal = Integer.parseInt(String.valueOf(firstChar), 16);
                 int secondDecimal = Integer.parseInt(String.valueOf(secondChar), 16);
-                result[i][j] = sBox[firstDecimal][secondDecimal];
+                result[i][j] = sBox[firstDecimal][secondDecimal].toUpperCase();
             }
         }
         return result;
@@ -146,9 +128,8 @@ public class AesUtils {
                             Integer.parseInt(text[k][col], 16) // Преобразование из HEX в int
                     );
                 }
-
                 // Конвертируем результат обратно в HEX строку
-                result[row][col] = String.format("%02x", mixColumnValue);
+                result[row][col] = String.format("%02x", mixColumnValue).toUpperCase();
             }
         }
 
@@ -190,17 +171,22 @@ public class AesUtils {
             words[i] = key.substring(i * 8, (i + 1) * 8); //первые 4 слова
         }
         for (int i = 4; i < 44; i++) {
+//            if (i >= 28) {
+//                System.out.println("now at " + i);
+//            } писал для решения проблемы
             String previousWord = words[i - 1];
             if (i % 4 == 0) {
                 previousWord = subWord(rotWord(previousWord));
-                previousWord = xorHex(previousWord, rConHex(i / 4 - 1));
+                previousWord = xorHex8(previousWord, rConHex(i / 4 - 1));
             }
             // Вычисляем текущее слово: words[i] = words[i-4] ^ temp
-            words[i] = xorHex(words[i - 4], previousWord);
+            words[i] = xorHex8(words[i - 4], previousWord);
         }
         // Формируем allKeys из words (каждые 4 слова = 1 раундовый ключ)
         for (int i = 0; i < 11; i++) {
             allKeys[i] = String.join("", words[i * 4], words[i * 4 + 1], words[i * 4 + 2], words[i * 4 + 3]);
+//            System.out.println("Раунд " + i + " = " + allKeys[i]); писал для решения проблемы
+
         }
         return allKeys;
     }
@@ -220,17 +206,44 @@ public class AesUtils {
         return result.toString();
     }
 
-    private String xorHex(String a, String b) {
+    private String xorHex8(String a, String b) {
+        long num1 = Long.parseLong(a, 16);
+        long num2 = Long.parseLong(b, 16);
+        return String.format("%08x", num1 ^ num2);
+    }
+
+    private String xorHex2(String a, String b) {
         long num1 = Long.parseLong(a, 16);
         long num2 = Long.parseLong(b, 16);
         return String.format("%02x", num1 ^ num2);
     }
+
 
     private String rConHex(int round) {
         return String.format("%08X", rCons[round]) + "000000";
     }
 
 
+    public String[][] executeRound(int roundNumber, String[][] state, String roundKey) {
+        printTextWithDelimiters("Раунд " + roundNumber);
+        System.out.println("Операция SubBytes");
+        state = subBytesAes(state);
+        printStringDoubleArrayAes(state);
+        System.out.println("Операция ShiftRows");
+        state = shiftRowsAes(state);
+        printStringDoubleArrayAes(state);
+        if (roundNumber < 10) { // MixColumns выполняется до последнего раунда
+            System.out.println("Операция MixColumns");
+            state = mixColumnsAes(state);
+            printStringDoubleArrayAes(state);
+        }
+        System.out.println("Операция AddRoundKey");
+        System.out.println("Ключ к " + roundNumber + "-му раунду: " + roundKey);
+        System.out.println("Состояние текста после " + roundNumber + "-го раунда");
+        state = addRoundKeyAes(state, stringToDoubleArrayAes(roundKey));
+        printStringDoubleArrayAes(state);
+        return state;
+    }
 }
 
 
